@@ -1,4 +1,4 @@
-package rpc
+package client
 
 import (
 	"context"
@@ -72,13 +72,14 @@ type CallSite struct {
 type Provider interface {
 	Nonce(ctx context.Context, address string) (uint64, error)
 	GetBalance(ctx context.Context, address string) (*fixed.Number, error)
-	BestBlockNumber(ctx context.Context) (int64, error)
+	BlockNumber(ctx context.Context) (uint64, error)
 	Call(ctx context.Context, callsite *CallSite) (val string, err error)
-	GetBlockByNumber(ctx context.Context, number int64) (val *Block, err error)
+	GetBlockByNumber(ctx context.Context, number uint64, full bool) (val *Block, err error)
 	GetTransactionByHash(ctx context.Context, tx string) (val *Transaction, err error)
 	SendRawTransaction(ctx context.Context, tx []byte) (val string, err error)
 	GetTransactionReceipt(ctx context.Context, tx string) (val *TransactionReceipt, err error)
-	BalanceOfAsset(ctx context.Context, address string, asset string, decimals int) (*fixed.Number, error)
-	DecimalsOfAsset(ctx context.Context, asset string) (int, error)
-	SuggestGasPrice(ctx context.Context) (*fixed.Number, error)
+	GasPrice(ctx context.Context) (*fixed.Number, error)
+	GetBlockTransactionCountByHash(ctx context.Context, blockHash string) (uint64, error)
+	GetBlockTransactionCountByNumber(ctx context.Context, number uint64) (uint64, error)
+	GetBlockByHash(ctx context.Context, blockHash string, full bool) (val *Block, err error)
 }

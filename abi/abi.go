@@ -1,38 +1,39 @@
 package abi
 
-import (
-	"encoding/hex"
-	"strings"
+type JSONFieldType string
 
-	"golang.org/x/crypto/sha3"
+const (
+	JSONTypeFunc        JSONFieldType = "function"
+	JSONTypeConstructor JSONFieldType = "constructor"
+	JSONTypeReceive     JSONFieldType = "receive"
+	JSONTypeFallback    JSONFieldType = "fallback"
+	JSONTypeEvent       JSONFieldType = "event"
+	JSONTypeError       JSONFieldType = "error"
 )
 
-// Encode encode method string
-func Encode(abi string) string {
-	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write([]byte(abi))
-	data := hasher.Sum(nil)
+type StateMutability string
 
-	return hex.EncodeToString(data[0:4])
+const (
+	StateMutabilityPure       StateMutability = "pure"
+	StateMutabilityView       StateMutability = "view"
+	StateMutabilityNonpayable StateMutability = "nonpayable"
+	StateMutabilityPayable    StateMutability = "payable"
+)
+
+type JSONField struct {
+	Type            JSONFieldType `json:"type"`
+	Name            string        `json:"name"`
+	Inputs          []*JSONParam  `json:"inputs"`
+	Outputs         []*JSONParam  `json:"outputs"`
+	StateMutability *string       `json:"stateMutability"`
+	Payable         *bool         `json:"payable"`
+	Constant        *bool         `json:"constant"`
+	Anonymous       *bool         `json:"anonymous"`
 }
 
-// PackNumeric .
-func PackNumeric(value string, bytes int) string {
-	return packNumeric(value, bytes)
-}
-
-func packNumeric(value string, bytes int) string {
-	if value == "" {
-		value = "0x0"
-	}
-
-	value = strings.TrimPrefix(value, "0x")
-
-	chars := bytes * 2
-
-	n := len(value)
-	if n%chars == 0 {
-		return value
-	}
-	return strings.Repeat("0", chars-n%chars) + value
+type JSONParam struct {
+	Name       string       `json:"name"`
+	Type       string       `json:"type"`
+	Components []*JSONParam `json:"components"`
+	Indexed    *bool        `json:"indexed"`
 }

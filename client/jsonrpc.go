@@ -1,4 +1,4 @@
-package rpc
+package client
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/libs4go/errors"
-	"github.com/libs4go/ethers/abi"
 	"github.com/libs4go/fixed"
 	"github.com/libs4go/jsonrpc"
 	"github.com/libs4go/jsonrpc/client"
@@ -40,7 +39,7 @@ func (client *jsonrpcProvider) GetBalance(ctx context.Context, address string) (
 }
 
 // BlockNumber get geth last block number
-func (client *jsonrpcProvider) BestBlockNumber(ctx context.Context) (int64, error) {
+func (client *jsonrpcProvider) BlockNumber(ctx context.Context) (uint64, error) {
 
 	var data string
 
@@ -56,7 +55,7 @@ func (client *jsonrpcProvider) BestBlockNumber(ctx context.Context) (int64, erro
 		return 0, errors.Wrap(err, "decode %s error", data)
 	}
 
-	return val.RawValue.Int64(), nil
+	return uint64(val.RawValue.Int64()), nil
 }
 
 // Nonce get address send transactions
@@ -64,6 +63,42 @@ func (client *jsonrpcProvider) Nonce(ctx context.Context, address string) (uint6
 	var data string
 
 	err := client.rpcCall(ctx, "eth_getTransactionCount", &data, address, "latest")
+
+	if err != nil {
+		return 0, err
+	}
+
+	val, err := fixed.New(0, fixed.HexRawValue(data))
+
+	if err != nil {
+		return 0, errors.Wrap(err, "decode %s error", data)
+	}
+
+	return uint64(val.RawValue.Int64()), nil
+}
+
+func (client *jsonrpcProvider) GetBlockTransactionCountByHash(ctx context.Context, blockHash string) (uint64, error) {
+	var data string
+
+	err := client.rpcCall(ctx, "eth_getBlockTransactionCountByHash", &data, blockHash)
+
+	if err != nil {
+		return 0, err
+	}
+
+	val, err := fixed.New(0, fixed.HexRawValue(data))
+
+	if err != nil {
+		return 0, errors.Wrap(err, "decode %s error", data)
+	}
+
+	return uint64(val.RawValue.Int64()), nil
+}
+
+func (client *jsonrpcProvider) GetBlockTransactionCountByNumber(ctx context.Context, number uint64) (uint64, error) {
+	var data string
+
+	err := client.rpcCall(ctx, "eth_getBlockTransactionCountByHash", &data, fmt.Sprintf("0x%x", number))
 
 	if err != nil {
 		return 0, err
@@ -86,9 +121,9 @@ func (client *jsonrpcProvider) Call(ctx context.Context, callsite *CallSite) (va
 }
 
 // BlockByNumber get block by number
-func (client *jsonrpcProvider) GetBlockByNumber(ctx context.Context, number int64) (val *Block, err error) {
+func (client *jsonrpcProvider) GetBlockByNumber(ctx context.Context, number uint64, full bool) (val *Block, err error) {
 
-	err = client.rpcCall(ctx, "eth_getBlockByNumber", &val, fmt.Sprintf("0x%x", number), true)
+	err = client.rpcCall(ctx, "eth_getBlockByNumber", &val, fmt.Sprintf("0x%x", number), full)
 
 	return
 }
@@ -117,46 +152,8 @@ func (client *jsonrpcProvider) GetTransactionReceipt(ctx context.Context, tx str
 	return
 }
 
-// BalanceOfAsset .
-func (client *jsonrpcProvider) BalanceOfAsset(ctx context.Context, address string, asset string, decimals int) (*fixed.Number, error) {
-	data := abi.BalanceOf(address)
-
-	valstr, err := client.Call(ctx, &CallSite{
-		To:   asset,
-		Data: data,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return fixed.New(decimals, fixed.HexRawValue(valstr))
-}
-
-// GetTokenDecimals .
-func (client *jsonrpcProvider) DecimalsOfAsset(ctx context.Context, asset string) (int, error) {
-	data := abi.GetDecimals()
-
-	valstr, err := client.Call(ctx, &CallSite{
-		To:   asset,
-		Data: data,
-	})
-
-	if err != nil {
-		return 0, err
-	}
-
-	val, err := fixed.New(0, fixed.HexRawValue(valstr))
-
-	if err != nil {
-		return 0, errors.Wrap(err, "decode hex %s error", valstr)
-	}
-
-	return int(val.RawValue.Int64()), nil
-}
-
 // SuggestGasPrice .
-func (client *jsonrpcProvider) SuggestGasPrice(ctx context.Context) (*fixed.Number, error) {
+func (client *jsonrpcProvider) GasPrice(ctx context.Context) (*fixed.Number, error) {
 	var val string
 
 	err := client.rpcCall(ctx, "eth_gasPrice", &val)
@@ -165,6 +162,12 @@ func (client *jsonrpcProvider) SuggestGasPrice(ctx context.Context) (*fixed.Numb
 	}
 
 	return fixed.New(18, fixed.HexRawValue(val))
+}
+
+func (client *jsonrpcProvider) GetBlockByHash(ctx context.Context, blockHash string, full bool) (val *Block, err error) {
+	err = client.rpcCall(ctx, "eth_getBlockByNumber", &val, blockHash, full)
+
+	return
 }
 
 // HttpProvider create http jsonrpc provider
