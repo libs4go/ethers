@@ -21,14 +21,12 @@ const (
 )
 
 type JSONField struct {
-	Type            JSONFieldType `json:"type"`
-	Name            string        `json:"name"`
-	Inputs          []*JSONParam  `json:"inputs"`
-	Outputs         []*JSONParam  `json:"outputs"`
-	StateMutability *string       `json:"stateMutability"`
-	Payable         *bool         `json:"payable"`
-	Constant        *bool         `json:"constant"`
-	Anonymous       *bool         `json:"anonymous"`
+	Type            JSONFieldType    `json:"type"`
+	Name            string           `json:"name"`
+	Inputs          []*JSONParam     `json:"inputs"`
+	Outputs         []*JSONParam     `json:"outputs"`
+	StateMutability *StateMutability `json:"stateMutability"`
+	Anonymous       *bool            `json:"anonymous"`
 }
 
 type JSONParam struct {
