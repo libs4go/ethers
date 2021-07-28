@@ -9,14 +9,17 @@ import (
 	"github.com/libs4go/fixed"
 	"github.com/libs4go/jsonrpc"
 	"github.com/libs4go/jsonrpc/client"
+	"github.com/libs4go/slf4go"
 )
 
 type jsonrpcProvider struct {
+	slf4go.Logger
 	client jsonrpc.Client
 }
 
 func NewJSONRPCProvider(client jsonrpc.Client) (Provider, error) {
 	return &jsonrpcProvider{
+		Logger: slf4go.Get("JSONRPC-PROVIDER"),
 		client: client,
 	}, nil
 }
@@ -166,7 +169,6 @@ func (client *jsonrpcProvider) GasPrice(ctx context.Context) (*fixed.Number, err
 
 func (client *jsonrpcProvider) GetBlockByHash(ctx context.Context, blockHash string, full bool) (val *Block, err error) {
 	err = client.rpcCall(ctx, "eth_getBlockByNumber", &val, blockHash, full)
-
 	return
 }
 

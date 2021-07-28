@@ -10,8 +10,46 @@ import (
 	"github.com/libs4go/ethers/address"
 	"github.com/libs4go/ethers/signer"
 	"github.com/libs4go/fixed"
+	"github.com/libs4go/scf4go"
+	_ "github.com/libs4go/scf4go/codec/json" //
+	"github.com/libs4go/scf4go/reader/memory"
+	"github.com/libs4go/slf4go"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/libs4go/slf4go/backend/console" //
 )
+
+var configFile = `
+{
+    "default": {
+		"backend": "console"
+	},
+	"backend": {
+		"console": {
+			"formatter": {
+				"timestamp":"Mon, 02 Jan 2006 15:04:05 -0700",
+				"output":"@t @l @s @m"
+			}
+		}
+	}
+}
+`
+
+func init() {
+	config := scf4go.New()
+
+	err := config.Load(memory.New(memory.Data(configFile, "json")))
+
+	if err != nil {
+		panic(err)
+	}
+
+	err = slf4go.Config(config)
+
+	if err != nil {
+		panic(err)
+	}
+}
 
 func TestRawTransaction(t *testing.T) {
 
@@ -68,4 +106,15 @@ func TestRawTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	println(txID)
+}
+
+func TestFetchTransaction(t *testing.T) {
+	provider, err := HttpProvider("https://bsc-dataseed1.binance.org/")
+
+	require.NoError(t, err)
+
+	_, err = provider.GetTransactionReceipt(context.Background(), "0x164acf4eb987a486d131d36c36d07c46f4306ee96c29bad9172fd3fa3e7edbcf")
+
+	require.NoError(t, err)
+
 }
