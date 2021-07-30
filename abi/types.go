@@ -1,6 +1,7 @@
 package abi
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"math/big"
@@ -219,9 +220,10 @@ type FixedArrayType struct {
 	Length  uint
 }
 
-func NewFixedArrayType(length uint) (ABIType, error) {
-	return &FixedBytesType{
-		LengthOfBytes: length,
+func NewFixedArrayType(Element ABIType, length uint) (ABIType, error) {
+	return &FixedArrayType{
+		Element: Element,
+		Length:  length,
 	}, nil
 }
 
@@ -238,23 +240,220 @@ func (t *FixedArrayType) Encode(value interface{}) (string, error) {
 }
 
 func (t *FixedArrayType) EncodeDynamic(value interface{}) (string, error) {
-	return "", nil
+
+	intType, err := NewIntegerType(256, false)
+
+	if err != nil {
+		return "", err
+	}
+
+	v := reflect.ValueOf(value)
+
+	if v.Type().Kind() != reflect.Slice {
+		return "", errors.Wrap(ErrValue, "expect slice got %v", v.Type())
+	}
+
+	if v.Len() != int(t.Length) {
+		return "", errors.Wrap(ErrLength, "fixed array length err %d", t.Length)
+	}
+
+	var headerWriter bytes.Buffer
+	var contentWriter bytes.Buffer
+
+	var offset = 32 * t.Length
+
+	for i := 0; i < v.Len(); i++ {
+
+		header, err := intType.Encode(offset)
+
+		if err != nil {
+			return "", errors.Wrap(err, "write header error")
+		}
+
+		_, err = headerWriter.WriteString(header)
+
+		if err != nil {
+			return "", errors.Wrap(err, "write header error")
+		}
+
+		content, err := intType.Encode(offset)
+
+		if err != nil {
+			return "", errors.Wrap(err, "write content error")
+		}
+
+		_, err = contentWriter.WriteString(content)
+
+		if err != nil {
+			return "", errors.Wrap(err, "write content error")
+		}
+
+		offset += uint(len(content))
+	}
+
+	return headerWriter.String() + contentWriter.String(), nil
+
 }
 
 func (t *FixedArrayType) EncodeStatic(value interface{}) (string, error) {
-	return "", nil
+	v := reflect.ValueOf(value)
+
+	if v.Type().Kind() != reflect.Slice {
+		return "", errors.Wrap(ErrValue, "expect slice got %v", v.Type())
+	}
+
+	if v.Len() != int(t.Length) {
+		return "", errors.Wrap(ErrLength, "fixed array length err %d", t.Length)
+	}
+
+	var writer strings.Builder
+
+	for i := 0; i < v.Len(); i++ {
+		data, err := t.Element.Encode(v.Index(i).Interface())
+
+		if err != nil {
+			return "", errors.Wrap(err, "encode array element %v error", t.Element)
+		}
+
+		_, err = writer.WriteString(data)
+
+		if err != nil {
+			return "", errors.Wrap(err, "write string error")
+		}
+	}
+
+	return writer.String(), nil
 }
 
 type BytesType struct {
 }
 
+func NewBytesType() (ABIType, error) {
+	return &BytesType{}, nil
+}
+
+func (t *BytesType) Dynamic() bool {
+	return true
+}
+
+func (t *BytesType) Encode(value interface{}) (string, error) {
+
+	v := reflect.ValueOf(value)
+
+	if v.Type().Kind() != reflect.Slice {
+		return "", errors.Wrap(ErrValue, "expect slice got %v", v.Type())
+	}
+
+	if v.Type().Elem().Kind() != reflect.Uint8 {
+		return "", errors.Wrap(ErrValue, "expect slice got %v", v.Type())
+	}
+
+	intType, err := NewIntegerType(256, false)
+
+	if err != nil {
+		return "", err
+	}
+
+	len, err := intType.Encode(len(v.Bytes()))
+
+	if err != nil {
+		return "", errors.Wrap(err, "enc bytes len error")
+	}
+
+	return len + paddingRight(v.Bytes()), nil
+}
+
 type StringType struct {
+}
+
+func NewStringType() (ABIType, error) {
+	return &StringType{}, nil
+}
+
+func (t *StringType) Dynamic() bool {
+	return true
+}
+
+func (t *StringType) Encode(value interface{}) (string, error) {
+
+	s, ok := value.(string)
+
+	if !ok {
+		return "", errors.Wrap(ErrValue, "expect string got %v", value)
+	}
+
+	bytesType, err := NewBytesType()
+
+	if err != nil {
+		return "", err
+	}
+
+	return bytesType.Encode([]byte(s))
 }
 
 type ArrayType struct {
 	Element ABIType
 }
 
+func NewArrayType() (ABIType, error) {
+	return &ArrayType{}, nil
+}
+
+func (t *ArrayType) Dynamic() bool {
+	return true
+}
+
+func (t *ArrayType) Encode(value interface{}) (string, error) {
+
+	v := reflect.ValueOf(value)
+
+	if v.Type().Kind() != reflect.Slice {
+		return "", errors.Wrap(ErrValue, "expect slice got %v", v.Type())
+	}
+
+	arrayType, err := NewFixedArrayType(t.Element, uint(v.Len()))
+
+	if err != nil {
+		return "", err
+	}
+
+	content, err := arrayType.Encode(value)
+
+	if err != nil {
+		return "", err
+	}
+
+	intType, err := NewIntegerType(256, false)
+
+	if err != nil {
+		return "", err
+	}
+
+	len, err := intType.Encode(uint(v.Len()))
+
+	if err != nil {
+		return "", errors.Wrap(err, "encode array len error")
+	}
+
+	return len + content, nil
+}
+
 type TupleType struct {
 	Fields []ABIType
+}
+
+func NewTupleType(fields []ABIType) (ABIType, error) {
+	return &TupleType{
+		Fields: fields,
+	}, nil
+}
+
+func (t *TupleType) Dynamic() bool {
+	return true
+}
+
+func (t *TupleType) Encode(value interface{}) (string, error) {
+	var headerWriter bytes.Buffer
+	var contentWriter bytes.Buffer
+
 }
