@@ -11,4 +11,5 @@ var (
 	ErrValue      = errors.New("encode value type error", errors.WithVendor(errVendor), errors.WithCode(-2))
 	ErrFixedBytes = errors.New("fixed bytes length mismatch", errors.WithVendor(errVendor), errors.WithCode(-3))
 	ErrLength     = errors.New("length error", errors.WithVendor(errVendor), errors.WithCode(-4))
+	ErrTag        = errors.New("generate tuple tag error", errors.WithVendor(errVendor), errors.WithCode(-5))
 )
