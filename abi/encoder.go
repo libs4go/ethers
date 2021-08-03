@@ -18,13 +18,19 @@ var bytesPtrType = reflect.TypeOf((*[]byte)(nil)).Elem()
 var stringType = reflect.TypeOf((*string)(nil)).Elem()
 
 func paddingLen(origin uint) uint {
-	return ((origin + 31) / 32) * 32
+	l := ((origin + 31) / 32) * 32
+
+	if l == 0 {
+		return 32
+	}
+
+	return l
 }
 
 func paddingLeft(src []byte) []byte {
 	paddingZero := len(src) % 32
 
-	if paddingZero == 0 {
+	if paddingZero == 0 && len(src) != 0 {
 		return src
 	}
 
@@ -35,7 +41,7 @@ func paddingLeft(src []byte) []byte {
 func paddingRight(src []byte) []byte {
 	paddingZero := len(src) % 32
 
-	if paddingZero == 0 {
+	if paddingZero == 0 && len(src) != 0 {
 		return src
 	}
 
@@ -102,7 +108,7 @@ func selector(abi string) []byte {
 
 func bitsCheck(maxBits uint, bits uint) error {
 	if bits%8 != 0 {
-		return errors.Wrap(ErrBits, "bits % 8 != 0")
+		return errors.Wrap(ErrBits, "bits %% 8 != 0")
 	}
 
 	if bits == 0 || bits > maxBits {
@@ -208,7 +214,7 @@ func (enc *integerEncoder) Unmarshal(data []byte, v interface{}) (uint, error) {
 			return 0, errors.Wrap(ErrValue, "expect int/uint types ptr")
 		}
 
-		t.Elem().Set(reflect.ValueOf(i.Uint64()))
+		t.Elem().Set(reflect.ValueOf(i.Uint64()).Convert(t.Elem().Type()))
 
 		return 32, nil
 
@@ -217,7 +223,7 @@ func (enc *integerEncoder) Unmarshal(data []byte, v interface{}) (uint, error) {
 			return 0, errors.Wrap(ErrValue, "expect int/uint types ptr")
 		}
 
-		t.Elem().Set(reflect.ValueOf(i.Int64()))
+		t.Elem().Set(reflect.ValueOf(i.Int64()).Convert(t.Elem().Type()))
 
 		return 32, nil
 
