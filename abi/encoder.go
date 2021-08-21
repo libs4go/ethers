@@ -425,8 +425,8 @@ func (enc *fixedArrayEncoder) String() string {
 func (enc *fixedArrayEncoder) Marshal(value interface{}) ([]byte, error) {
 	v := reflect.ValueOf(value)
 
-	if v.Kind() != reflect.Slice && enc.len != uint(v.Len()) {
-		return nil, errors.Wrap(ErrValue, "expect [%d]content", enc.len)
+	if v.Kind() != reflect.Array || enc.len != uint(v.Len()) {
+		return nil, errors.Wrap(ErrValue, "expect %s", enc)
 	}
 
 	if enc.elem.Static() {
@@ -789,7 +789,7 @@ func (enc *arrayEncoder) Marshal(value interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	content, err := encoder.Marshal(v.Convert(reflect.ArrayOf(l, v.Elem().Type())).Interface())
+	content, err := encoder.Marshal(value)
 
 	if err != nil {
 		return nil, err

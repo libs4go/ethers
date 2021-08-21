@@ -218,7 +218,7 @@ func TestTuple(t *testing.T) {
 
 	require.NoError(t, err)
 
-	array2, err := FixedArray(array3, 2)
+	array2, err := Array(array3)
 
 	require.NoError(t, err)
 
@@ -226,7 +226,7 @@ func TestTuple(t *testing.T) {
 
 	require.NoError(t, err)
 
-	buff, err := enc.Marshal([]interface{}{1, big.NewInt(1), big.NewInt(-1), true, [2][3][32]byte{{{1}, {2}, {3}}, {{3}, {4}, {5}}}})
+	buff, err := enc.Marshal([]interface{}{1, big.NewInt(1), big.NewInt(-1), true, [][3][32]byte{{{1}, {2}, {3}}, {{3}, {4}, {5}}}})
 
 	require.NoError(t, err)
 
