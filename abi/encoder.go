@@ -192,7 +192,7 @@ func (enc *integerEncoder) Unmarshal(data []byte, v interface{}) (uint, error) {
 			return 32, nil
 		}
 
-		if reflect.Ptr == t.Elem().Kind() && t.Elem().Elem().Type() == bigIntType {
+		if reflect.Ptr == t.Type().Elem().Kind() && t.Type().Elem().Elem() == bigIntType {
 			t.Elem().Set(reflect.ValueOf(i))
 			return 32, nil
 		}
@@ -368,11 +368,11 @@ func (enc *fixedBytesEncoder) Static() bool {
 func (enc *fixedBytesEncoder) Marshal(value interface{}) ([]byte, error) {
 	v := reflect.ValueOf(value)
 
-	if v.Kind() != reflect.Array && v.Type().Elem().Kind() != reflect.Uint8 {
-		return nil, errors.Wrap(ErrValue, "expect [%d]byte", enc.len)
+	if v.Kind() != reflect.Array || reflect.TypeOf(value).Elem().Kind() != reflect.Uint8 {
+		return nil, errors.Wrap(ErrValue, "expect %s, got %v", enc, v.Type())
 	}
 
-	vv := reflect.New(reflect.ArrayOf(int(enc.len), v.Type().Elem()))
+	vv := reflect.New(v.Type())
 
 	vv.Elem().Set(v)
 
@@ -390,14 +390,20 @@ func (enc *fixedBytesEncoder) Unmarshal(data []byte, v interface{}) (uint, error
 	t := reflect.ValueOf(v)
 
 	if t.Kind() != reflect.Ptr || t.IsNil() {
-		return 0, errors.Wrap(ErrValue, "expect []byte ptr")
+		return 0, errors.Wrap(ErrValue, "expect %s ptr,got %v", enc, t.Type().Elem())
 	}
 
-	if t.Elem().Type() != bytesPtrType {
-		return 0, errors.Wrap(ErrValue, "expect []byte ptr")
+	if t.Type().Elem().Kind() != reflect.Array {
+		return 0, errors.Wrap(ErrValue, "expect %s ptr,got %v", enc, t.Type().Elem())
 	}
 
-	t.Elem().Set(reflect.ValueOf(data[:enc.len]))
+	if t.Type().Elem().Elem().Kind() != reflect.Uint8 {
+		return 0, errors.Wrap(ErrValue, "expect %s ptr,got %v", enc, t.Type().Elem())
+	}
+
+	d := data[:enc.len]
+
+	t.Elem().Set(reflect.ValueOf(d).Convert(t.Type()).Elem())
 
 	return pl, nil
 }
@@ -426,7 +432,7 @@ func (enc *fixedArrayEncoder) Marshal(value interface{}) ([]byte, error) {
 	v := reflect.ValueOf(value)
 
 	if v.Kind() != reflect.Array || enc.len != uint(v.Len()) {
-		return nil, errors.Wrap(ErrValue, "expect %s", enc)
+		return nil, errors.Wrap(ErrValue, "expect %s, got %v", enc, v.Type())
 	}
 
 	if enc.elem.Static() {
@@ -500,17 +506,21 @@ func (enc *fixedArrayEncoder) Unmarshal(data []byte, v interface{}) (uint, error
 	t := reflect.ValueOf(v)
 
 	if t.Kind() != reflect.Ptr || t.IsNil() {
-		return 0, errors.Wrap(ErrValue, "expect slice ptr")
+		return 0, errors.Wrap(ErrValue, "expect %s ptr", enc)
 	}
 
-	if t.Elem().Kind() != reflect.Slice {
-		return 0, errors.Wrap(ErrValue, "expect slice ptr")
+	if t.Elem().Kind() != reflect.Array {
+		return 0, errors.Wrap(ErrValue, "expect %s,got %v", enc, t.Type())
+	}
+
+	if t.Elem().Len() != int(enc.len) {
+		return 0, errors.Wrap(ErrValue, "expect %s,got %v", enc, reflect.Indirect(t).Type())
 	}
 
 	if enc.elem.Static() {
-		return enc.staticUnmarshal(data, t.Elem())
+		return enc.staticUnmarshal(data, t)
 	} else {
-		return enc.dynamicUnmarshal(data, t.Elem())
+		return enc.dynamicUnmarshal(data, t)
 	}
 
 }
@@ -518,7 +528,7 @@ func (enc *fixedArrayEncoder) Unmarshal(data []byte, v interface{}) (uint, error
 func (enc *fixedArrayEncoder) staticUnmarshal(data []byte, v reflect.Value) (uint, error) {
 
 	// create slice
-	slice := reflect.New(v.Type())
+	array := reflect.New(v.Type().Elem())
 
 	offset := uint(0)
 
@@ -527,18 +537,20 @@ func (enc *fixedArrayEncoder) staticUnmarshal(data []byte, v reflect.Value) (uin
 			return 0, errors.Wrap(ErrLength, "abi data too short")
 		}
 
-		content := reflect.New(v.Elem().Type())
+		content := reflect.New(array.Type().Elem().Elem())
 
-		len, err := enc.elem.Unmarshal(data[offset:], content.Addr().Interface())
+		len, err := enc.elem.Unmarshal(data[offset:], content.Interface())
 
 		if err != nil {
 			return 0, err
 		}
 
-		slice = reflect.Append(slice, content)
+		array.Elem().Index(i).Set(content.Elem())
 
 		offset += len
 	}
+
+	reflect.Indirect(v).Set(array.Elem())
 
 	return offset, nil
 }
@@ -558,8 +570,8 @@ func (enc *fixedArrayEncoder) dynamicUnmarshal(data []byte, v reflect.Value) (ui
 
 	offset := 0
 
-	// create slice
-	slice := reflect.New(v.Type())
+	// create array ptr
+	array := reflect.New(v.Type().Elem())
 
 	contentLen := uint(0)
 
@@ -580,9 +592,9 @@ func (enc *fixedArrayEncoder) dynamicUnmarshal(data []byte, v reflect.Value) (ui
 			return 0, errors.Wrap(ErrLength, "abi data too short")
 		}
 
-		content := reflect.New(v.Elem().Type())
+		content := reflect.New(v.Type().Elem().Elem())
 
-		len, err := enc.elem.Unmarshal(data[elemOffset:], content.Addr().Interface())
+		len, err := enc.elem.Unmarshal(data[elemOffset:], content.Interface())
 
 		if err != nil {
 			return 0, err
@@ -592,8 +604,10 @@ func (enc *fixedArrayEncoder) dynamicUnmarshal(data []byte, v reflect.Value) (ui
 
 		contentLen = elemOffset + len
 
-		slice = reflect.Append(slice, content)
+		array.Elem().Index(i).Set(content)
 	}
+
+	reflect.Indirect(v).Set(array.Elem())
 
 	return headerLen + contentLen, nil
 }
@@ -626,7 +640,9 @@ func (enc *bytesEncoder) Marshal(value interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	content, err := encoder.Marshal(b)
+	arrayT := reflect.PtrTo(reflect.ArrayOf(len(b), reflect.TypeOf(b).Elem()))
+
+	content, err := encoder.Marshal(reflect.ValueOf(b).Convert(arrayT).Elem().Interface())
 
 	if err != nil {
 		return nil, err
@@ -677,11 +693,15 @@ func (enc *bytesEncoder) Unmarshal(data []byte, v interface{}) (uint, error) {
 		return 0, err
 	}
 
-	contentLen, err := encoder.Unmarshal(data[32:], v)
+	vv := reflect.New(reflect.ArrayOf(int(k), reflect.TypeOf((*byte)(nil)).Elem()))
+
+	contentLen, err := encoder.Unmarshal(data[32:], vv.Interface())
 
 	if err != nil {
 		return 0, err
 	}
+
+	reflect.ValueOf(v).Elem().Set(vv.Elem().Slice(0, vv.Elem().Len()))
 
 	return contentLen + 32, nil
 }
@@ -789,7 +809,9 @@ func (enc *arrayEncoder) Marshal(value interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	content, err := encoder.Marshal(value)
+	arrayT := reflect.PtrTo(reflect.ArrayOf(l, v.Type().Elem()))
+
+	content, err := encoder.Marshal(reflect.Indirect(v.Convert(arrayT)).Interface())
 
 	if err != nil {
 		return nil, err
@@ -841,7 +863,7 @@ func (enc *arrayEncoder) Unmarshal(data []byte, value interface{}) (uint, error)
 		return 0, err
 	}
 
-	v.Elem().Set(arrayValue.Slice(0, arrayValue.Len()))
+	v.Elem().Set(arrayValue.Elem().Slice(0, arrayValue.Elem().Len()))
 
 	return l + 32, nil
 }
@@ -890,24 +912,42 @@ func (enc *tupleEncoder) Marshal(value interface{}) ([]byte, error) {
 
 	if err != nil {
 		return nil, err
+
 	}
+
+	cached := make(map[int][]byte)
+	headerLen := 0
 
 	for i, elem := range enc.elems {
 		if elem.Static() {
+
 			buff, err := elem.Marshal(slice[i])
 
 			if err != nil {
 				return nil, err
 			}
 
-			_, err = header.Write(buff)
+			cached[i] = buff
+
+			headerLen += len(buff)
+
+		} else {
+			headerLen += 32
+		}
+	}
+
+	for i, elem := range enc.elems {
+		if elem.Static() {
+
+			_, err = header.Write(cached[i])
 
 			if err != nil {
 				return nil, err
 			}
 
 		} else {
-			buff, err := iEncoder.Marshal(body.Len() + header.Len())
+
+			buff, err := iEncoder.Marshal(body.Len() + headerLen)
 
 			if err != nil {
 				return nil, err
@@ -946,7 +986,7 @@ func (enc *tupleEncoder) Unmarshal(data []byte, value interface{}) (uint, error)
 	slice, ok := value.([]interface{})
 
 	if !ok {
-		return 0, errors.Wrap(ErrValue, "Tuple: expect marshal value []interface{}")
+		return 0, errors.Wrap(ErrValue, "Tuple: expect umarshal value []interface{}")
 	}
 
 	if len(slice) != len(enc.elems) {

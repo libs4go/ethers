@@ -63,7 +63,7 @@ func IntegerCheck(t *testing.T, signed bool, bits uint, val interface{}, hexstri
 
 }
 
-func BytesCheck(t *testing.T, encoder Encoder, val []byte, hexstring string) {
+func BytesCheck(t *testing.T, encoder Encoder, val interface{}, hexstring string) {
 	data, err := encoder.Marshal(val)
 
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestFixedBytes(t *testing.T) {
 
 	require.NoError(t, err)
 
-	BytesCheck(t, bytesEncoder, []byte{0xf0, 0xf0, 0xf0}, "f0f0f00000000000000000000000000000000000000000000000000000000000")
+	BytesCheck(t, bytesEncoder, [3]byte{0xf0, 0xf0, 0xf0}, "f0f0f00000000000000000000000000000000000000000000000000000000000")
 }
 
 func TestString(t *testing.T) {
@@ -195,6 +195,8 @@ func TestTuple(t *testing.T) {
 		"0000000000000000000000000000000000000000000000000000000000000001" + // struct[b]
 		"ff00000000000000000000000000000000000000000000000000000000000001" + // struct[c]
 		"0000000000000000000000000000000000000000000000000000000000000001" + // struct[d]
+		"00000000000000000000000000000000000000000000000000000000000000a0" + // struct[e] offset
+		"0000000000000000000000000000000000000000000000000000000000000002" + // len(struct[e])
 		"0100000000000000000000000000000000000000000000000000000000000000" + // struct[e] array[0][0]
 		"0200000000000000000000000000000000000000000000000000000000000000" + // struct[e] array[0][1]
 		"0300000000000000000000000000000000000000000000000000000000000000" + // struct[e] array[0][2]
@@ -231,4 +233,28 @@ func TestTuple(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, hex.EncodeToString(buff), packed)
+
+	var a int
+	var b *big.Int
+	var c *big.Int
+	var d bool
+	var e [][3][32]byte
+
+	data := []interface{}{&a, &b, &c, &d, &e}
+
+	l, err := enc.Unmarshal(buff, data)
+
+	require.NoError(t, err)
+
+	require.Equal(t, l, uint(len(buff)))
+
+	require.Equal(t, e, [][3][32]byte{{{1}, {2}, {3}}, {{3}, {4}, {5}}})
+
+	require.Equal(t, a, 1)
+
+	require.Equal(t, b, big.NewInt(1))
+
+	require.Equal(t, c, big.NewInt(-1))
+
+	require.Equal(t, d, true)
 }
