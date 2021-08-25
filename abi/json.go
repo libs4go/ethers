@@ -35,3 +35,21 @@ type JSONParam struct {
 	Components []*JSONParam `json:"components"`
 	Indexed    *bool        `json:"indexed"`
 }
+
+// Module abi parsed module
+type Module interface {
+}
+
+// Parse abi module from json bytes
+func FromJSON(json []byte) (Module, error) {
+	module := &moduleImpl{}
+	return module, module.parse(json)
+}
+
+type moduleImpl struct {
+}
+
+// parse input json bytes and create memory encoder tree
+func (module *moduleImpl) parse(json []byte) error {
+	return nil
+}
