@@ -9,11 +9,11 @@ import (
 
 	"github.com/libs4go/errors"
 	"github.com/libs4go/fixed"
+	"golang.org/x/crypto/sha3"
 )
 
 var bigIntType = reflect.TypeOf((*big.Int)(nil)).Elem()
 var fixedType = reflect.TypeOf((*fixed.Number)(nil)).Elem()
-var bytesPtrType = reflect.TypeOf((*[]byte)(nil)).Elem()
 var stringType = reflect.TypeOf((*string)(nil)).Elem()
 
 func paddingLen(origin uint) uint {
@@ -47,14 +47,6 @@ func paddingRight(src []byte) []byte {
 	return append(src, bytes.Repeat([]byte{0}, 32-paddingZero)...)
 }
 
-// func selector(abi string) []byte {
-// 	hasher := sha3.NewLegacyKeccak256()
-// 	hasher.Write([]byte(abi))
-// 	data := hasher.Sum(nil)
-
-// 	return data[0:4]
-// }
-
 func bitsCheck(maxBits uint, bits uint) error {
 	if bits%8 != 0 {
 		return errors.Wrap(ErrBits, "bits %% 8 != 0")
@@ -65,6 +57,15 @@ func bitsCheck(maxBits uint, bits uint) error {
 	}
 
 	return nil
+}
+
+// Selector function selector
+func Selector(abi string) []byte {
+	hasher := sha3.NewLegacyKeccak256()
+	hasher.Write([]byte(abi))
+	data := hasher.Sum(nil)
+
+	return data[0:4]
 }
 
 // Encoder types encoder interface
