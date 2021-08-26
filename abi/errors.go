@@ -12,4 +12,5 @@ var (
 	ErrFixedBytes = errors.New("fixed bytes length mismatch", errors.WithVendor(errVendor), errors.WithCode(-3))
 	ErrLength     = errors.New("length error", errors.WithVendor(errVendor), errors.WithCode(-4))
 	ErrTag        = errors.New("generate tuple tag error", errors.WithVendor(errVendor), errors.WithCode(-5))
+	ErrJSON       = errors.New("parse json abi error", errors.WithVendor(errVendor), errors.WithCode(-6))
 )

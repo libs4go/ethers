@@ -359,7 +359,7 @@ func FixedBytes(len uint) (Encoder, error) {
 }
 
 func (enc *fixedBytesEncoder) String() string {
-	return fmt.Sprintf("[%d]byte", enc.len)
+	return fmt.Sprintf("byte[%d]", enc.len)
 }
 
 func (enc *fixedBytesEncoder) Static() bool {
@@ -426,7 +426,7 @@ func (enc *fixedArrayEncoder) Static() bool {
 }
 
 func (enc *fixedArrayEncoder) String() string {
-	return fmt.Sprintf("[%d]%s", enc.len, enc.elem)
+	return fmt.Sprintf("%s[%d]", enc.elem, enc.len)
 }
 
 func (enc *fixedArrayEncoder) Marshal(value interface{}) ([]byte, error) {
@@ -625,7 +625,7 @@ func (enc *bytesEncoder) Static() bool {
 }
 
 func (enc *bytesEncoder) String() string {
-	return "[]byte"
+	return "byte[]"
 }
 
 func (enc *bytesEncoder) Marshal(value interface{}) ([]byte, error) {
@@ -780,7 +780,7 @@ func (enc *arrayEncoder) Static() bool {
 }
 
 func (enc *arrayEncoder) String() string {
-	return fmt.Sprintf("[]%s", enc.elem)
+	return fmt.Sprintf("%s[]", enc.elem)
 }
 
 func (enc *arrayEncoder) Marshal(value interface{}) ([]byte, error) {
