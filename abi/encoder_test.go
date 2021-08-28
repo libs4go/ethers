@@ -224,7 +224,7 @@ func TestTuple(t *testing.T) {
 
 	require.NoError(t, err)
 
-	enc, err := Tuple(ienc, ienc, ienc, benc, array2)
+	enc, err := Tuple("test", ienc, ienc, ienc, benc, array2)
 
 	require.NoError(t, err)
 

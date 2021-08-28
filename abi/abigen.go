@@ -1,6 +1,11 @@
 package abi
 
+import (
+	"io"
+)
+
 // GenContract generate golang contract binding code
-func GenContract(abi []byte) ([]byte, error) {
-	return nil, nil
+func (contract *contractImpl) GenCode(writer io.Writer) error {
+
+	return nil
 }

@@ -74,6 +74,18 @@ type Encoder interface {
 	Marshal(value interface{}) ([]byte, error)
 	Unmarshal(data []byte, v interface{}) (uint, error)
 	fmt.Stringer
+	Accept(visitor Visitor)
+}
+
+type Visitor interface {
+	HandleInt(sign bool, bits uint)
+	HandleBool()
+	handleFixedBytes(len uint)
+	HandleFixedArray(len uint, elem Encoder)
+	HandleBytes()
+	HandleArray(elem Encoder)
+	HandleString()
+	HandleTuple(name string, elems []Encoder)
 }
 
 type integerEncoder struct {
@@ -103,6 +115,10 @@ func (enc *integerEncoder) String() string {
 		return fmt.Sprintf("uint%d", enc.bits)
 	}
 
+}
+
+func (enc *integerEncoder) Accept(visitor Visitor) {
+	visitor.HandleInt(enc.sign, enc.bits)
 }
 
 func (enc *integerEncoder) Static() bool {
@@ -216,6 +232,10 @@ func Bool() (Encoder, error) {
 	return &boolEncoder{
 		Encoder: i,
 	}, nil
+}
+
+func (enc *boolEncoder) String() string {
+	return "bool"
 }
 
 func (enc *boolEncoder) Marshal(value interface{}) ([]byte, error) {
@@ -358,8 +378,12 @@ func FixedBytes(len uint) (Encoder, error) {
 	}, nil
 }
 
+func (enc *fixedBytesEncoder) Accept(visitor Visitor) {
+	visitor.handleFixedBytes(enc.len)
+}
+
 func (enc *fixedBytesEncoder) String() string {
-	return fmt.Sprintf("byte[%d]", enc.len)
+	return fmt.Sprintf("bytes%d", enc.len)
 }
 
 func (enc *fixedBytesEncoder) Static() bool {
@@ -419,6 +443,10 @@ func FixedArray(elem Encoder, len uint) (Encoder, error) {
 		len:  len,
 		elem: elem,
 	}, nil
+}
+
+func (enc *fixedArrayEncoder) Accept(visitor Visitor) {
+	visitor.HandleFixedArray(enc.len, enc.elem)
 }
 
 func (enc *fixedArrayEncoder) Static() bool {
@@ -620,12 +648,16 @@ func Bytes() (Encoder, error) {
 	return &bytesEncoder{}, nil
 }
 
+func (enc *bytesEncoder) Accept(visitor Visitor) {
+	visitor.HandleBytes()
+}
+
 func (enc *bytesEncoder) Static() bool {
 	return false
 }
 
 func (enc *bytesEncoder) String() string {
-	return "byte[]"
+	return "bytes"
 }
 
 func (enc *bytesEncoder) Marshal(value interface{}) ([]byte, error) {
@@ -714,6 +746,10 @@ func String() (Encoder, error) {
 	return &stringEncoder{}, nil
 }
 
+func (enc *stringEncoder) Accept(visitor Visitor) {
+	visitor.HandleString()
+}
+
 func (enc *stringEncoder) Static() bool {
 	return false
 }
@@ -773,6 +809,10 @@ func Array(elem Encoder) (Encoder, error) {
 	return &arrayEncoder{
 		elem: elem,
 	}, nil
+}
+
+func (enc *arrayEncoder) Accept(visitor Visitor) {
+	visitor.HandleArray(enc.elem)
 }
 
 func (enc *arrayEncoder) Static() bool {
@@ -870,14 +910,20 @@ func (enc *arrayEncoder) Unmarshal(data []byte, value interface{}) (uint, error)
 }
 
 type tupleEncoder struct {
+	name  string
 	elems []Encoder
 }
 
-func Tuple(elems ...Encoder) (Encoder, error) {
+func Tuple(name string, elems ...Encoder) (Encoder, error) {
 
 	return &tupleEncoder{
+		name:  name,
 		elems: elems,
 	}, nil
+}
+
+func (enc *tupleEncoder) Accept(visitor Visitor) {
+	visitor.HandleTuple(enc.name, enc.elems)
 }
 
 func (enc *tupleEncoder) Static() bool {
