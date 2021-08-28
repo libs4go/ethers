@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/libs4go/errors"
 	"github.com/libs4go/fixed"
@@ -75,6 +76,7 @@ type Encoder interface {
 	Unmarshal(data []byte, v interface{}) (uint, error)
 	fmt.Stringer
 	Accept(visitor Visitor)
+	GoTypeName() string
 }
 
 type Visitor interface {
@@ -115,6 +117,10 @@ func (enc *integerEncoder) String() string {
 		return fmt.Sprintf("uint%d", enc.bits)
 	}
 
+}
+
+func (enc *integerEncoder) GoTypeName() string {
+	return "*big.Int"
 }
 
 func (enc *integerEncoder) Accept(visitor Visitor) {
@@ -235,6 +241,10 @@ func Bool() (Encoder, error) {
 }
 
 func (enc *boolEncoder) String() string {
+	return "bool"
+}
+
+func (enc *boolEncoder) GoTypeName() string {
 	return "bool"
 }
 
@@ -386,6 +396,10 @@ func (enc *fixedBytesEncoder) String() string {
 	return fmt.Sprintf("bytes%d", enc.len)
 }
 
+func (enc *fixedBytesEncoder) GoTypeName() string {
+	return fmt.Sprintf("[%d]byte", enc.len)
+}
+
 func (enc *fixedBytesEncoder) Static() bool {
 	return true
 }
@@ -455,6 +469,10 @@ func (enc *fixedArrayEncoder) Static() bool {
 
 func (enc *fixedArrayEncoder) String() string {
 	return fmt.Sprintf("%s[%d]", enc.elem, enc.len)
+}
+
+func (enc *fixedArrayEncoder) GoTypeName() string {
+	return fmt.Sprintf("[%d]%s", enc.len, enc.elem)
 }
 
 func (enc *fixedArrayEncoder) Marshal(value interface{}) ([]byte, error) {
@@ -660,6 +678,10 @@ func (enc *bytesEncoder) String() string {
 	return "bytes"
 }
 
+func (enc *bytesEncoder) GoTypeName() string {
+	return "[]byte"
+}
+
 func (enc *bytesEncoder) Marshal(value interface{}) ([]byte, error) {
 	b, ok := value.([]byte)
 
@@ -746,6 +768,10 @@ func String() (Encoder, error) {
 	return &stringEncoder{}, nil
 }
 
+func (enc *stringEncoder) GoTypeName() string {
+	return "string"
+}
+
 func (enc *stringEncoder) Accept(visitor Visitor) {
 	visitor.HandleString()
 }
@@ -821,6 +847,10 @@ func (enc *arrayEncoder) Static() bool {
 
 func (enc *arrayEncoder) String() string {
 	return fmt.Sprintf("%s[]", enc.elem)
+}
+
+func (enc *arrayEncoder) GoTypeName() string {
+	return fmt.Sprintf("[]%s", enc.elem)
 }
 
 func (enc *arrayEncoder) Marshal(value interface{}) ([]byte, error) {
@@ -938,6 +968,10 @@ func (enc *tupleEncoder) String() string {
 	}
 
 	return fmt.Sprintf("(%s)", strings.Join(elems, ","))
+}
+
+func (enc *tupleEncoder) GoTypeName() string {
+	return fmt.Sprintf("*%s", enc.name)
 }
 
 func (enc *tupleEncoder) Marshal(value interface{}) ([]byte, error) {
@@ -1089,4 +1123,50 @@ func (enc *tupleEncoder) Unmarshal(data []byte, value interface{}) (uint, error)
 	}
 
 	return offset + contentLen, nil
+}
+
+var builtinTypeEncoders map[string]Encoder
+var builtinTypeOnce sync.Once
+
+func ensure(encoder Encoder, err error) Encoder {
+	if err != nil {
+		panic(err)
+	}
+
+	return encoder
+}
+
+func initBuiltinTypeEncoders() {
+	builtinTypeEncoders = make(map[string]Encoder)
+
+	var encoders []Encoder
+
+	for i := uint(0); i < 32; i++ {
+		encoders = append(encoders, ensure(Integer(false, (i+1)*8)))
+		encoders = append(encoders, ensure(Integer(true, (i+1)*8)))
+		encoders = append(encoders, ensure(FixedBytes((i + 1))))
+	}
+
+	encoders = append(encoders, ensure(Bool()))
+
+	encoders = append(encoders, ensure(String()))
+
+	encoders = append(encoders, ensure(Bytes()))
+
+	for _, encoder := range encoders {
+		builtinTypeEncoders[encoder.String()] = encoder
+	}
+
+	builtinTypeEncoders["address"] = builtinTypeEncoders["uint160"]
+	builtinTypeEncoders["uint"] = builtinTypeEncoders["uint256"]
+	builtinTypeEncoders["int"] = builtinTypeEncoders["int256"]
+}
+
+// Get Builtin type encoder
+func Builtin(name string) (Encoder, bool) {
+	builtinTypeOnce.Do(initBuiltinTypeEncoders)
+
+	e, ok := builtinTypeEncoders[name]
+
+	return e, ok
 }

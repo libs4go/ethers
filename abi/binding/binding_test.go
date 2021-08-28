@@ -1,4 +1,4 @@
-package abi
+package binding
 
 import (
 	"encoding/hex"
@@ -11,33 +11,36 @@ import (
 )
 
 func TestArrayRegex(t *testing.T) {
-	allMatch := arrayTypeRegex.FindAllString("uint256[1][][3]", -1)
+	allMatch := ArrayRegex.FindAllString("uint256[1][][3]", -1)
 
 	require.Equal(t, allMatch, []string{"uint256", "[1]", "[]", "[3]"})
 
-	allMatch = arrayTypeLenRegex.FindStringSubmatch("[]")
+	allMatch = ArrayLenRegex.FindStringSubmatch("[]")
 
 	println(fmt.Sprintf("%v", allMatch))
 }
 
 func TestTupleNameRegex(t *testing.T) {
-	println(fmt.Sprintf(tupleNameRegex.FindStringSubmatch("struct CurveNFT[2][]")[1]))
+	println(fmt.Sprintf(TupleNameRegex.FindStringSubmatch("struct CurveNFT[2][]")[1]))
 }
 
 func TestLoadFiles(t *testing.T) {
+	symbols := NewSymbols()
 	files, err := ioutil.ReadDir("./testdata")
 
 	require.NoError(t, err)
 
 	for _, file := range files {
-		_, err = ParseFile(filepath.Join("./testdata", file.Name()))
+		_, err = ParseFile(filepath.Join("./testdata", file.Name()), symbols)
 
 		require.NoError(t, err)
 	}
 }
 
 func TestFooContract(t *testing.T) {
-	contract, err := ParseFile("./testdata/Foo.json")
+	symbols := NewSymbols()
+
+	contract, err := ParseFile("./testdata/Foo.json", symbols)
 
 	require.NoError(t, err)
 
