@@ -31,7 +31,7 @@ func TestLoadFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, file := range files {
-		_, err = ParseFile(filepath.Join("./testdata", file.Name()), symbols)
+		_, err = ParseFile(file.Name(), filepath.Join("./testdata", file.Name()), symbols)
 
 		require.NoError(t, err)
 	}
@@ -40,7 +40,7 @@ func TestLoadFiles(t *testing.T) {
 func TestFooContract(t *testing.T) {
 	symbols := NewSymbols()
 
-	contract, err := ParseFile("./testdata/Foo.json", symbols)
+	contract, err := ParseFile("Foo", "./testdata/Foo.json", symbols)
 
 	require.NoError(t, err)
 

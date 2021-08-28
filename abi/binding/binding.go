@@ -26,33 +26,6 @@ type Tuple struct {
 	Encoder       abi.Encoder // tuple abi encoder
 }
 
-// Tuple symbols register table
-type Symbols interface {
-	RegisterTuple(tuple *Tuple)
-	GetTuple(name string) (*Tuple, bool)
-}
-
-type symbolsImpl struct {
-	tuples map[string]*Tuple
-}
-
-// NewSymbols create default symbols table
-func NewSymbols() Symbols {
-	return &symbolsImpl{
-		tuples: make(map[string]*Tuple),
-	}
-}
-
-func (impl *symbolsImpl) RegisterTuple(tuple *Tuple) {
-	impl.tuples[tuple.BindingName] = tuple
-}
-
-func (impl *symbolsImpl) GetTuple(name string) (*Tuple, bool) {
-	t, ok := impl.tuples[name]
-
-	return t, ok
-}
-
 type funcABI struct {
 	selector []byte      // function selector
 	inputs   abi.Encoder // parameter tuple encoder
@@ -92,7 +65,7 @@ func (contract *contractImpl) Func(signature string) (abi.Func, bool) {
 	return f, ok
 }
 
-func (contract *contractImpl) parseFunc(index int, field *abi.JSONField, symbols Symbols) (*funcABI, error) {
+func (contract *contractImpl) parseFunc(index int, field *abi.JSONField, binder Binder) (*funcABI, error) {
 	if field.Type != abi.JSONTypeFunc && field.Type != abi.JSONTypeConstructor {
 		return nil, errors.Wrap(abi.ErrJSON, "parse func target(%s) error", field.Type)
 	}
@@ -121,7 +94,7 @@ func (contract *contractImpl) parseFunc(index int, field *abi.JSONField, symbols
 		f.selector = abi.Selector(buff.String())
 	}
 
-	encoder, err := contract.parseParams("inputs", field.Inputs, symbols)
+	encoder, inputs, err := contract.parseParams("inputs", field.Inputs, binder)
 
 	if err != nil {
 		return nil, err
@@ -129,7 +102,7 @@ func (contract *contractImpl) parseFunc(index int, field *abi.JSONField, symbols
 
 	f.inputs = encoder
 
-	encoder, err = contract.parseParams("outputs", field.Outputs, symbols)
+	encoder, outputs, err := contract.parseParams("outputs", field.Outputs, binder)
 
 	if err != nil {
 		return nil, err
@@ -137,26 +110,34 @@ func (contract *contractImpl) parseFunc(index int, field *abi.JSONField, symbols
 
 	f.outputs = encoder
 
+	binder.Func(field.Name, f.SelectorString(), inputs, outputs)
+
 	return f, nil
 }
 
-func (contract *contractImpl) parseParams(name string, params []*abi.JSONParam, symbols Symbols) (abi.Encoder, error) {
+func (contract *contractImpl) parseParams(name string, params []*abi.JSONParam, binder Binder) (abi.Encoder, []abi.Encoder, error) {
 	var elems []abi.Encoder
 
 	for _, param := range params {
-		enc, err := contract.parseParam(param, symbols)
+		enc, err := contract.parseParam(param, binder)
 
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		elems = append(elems, enc)
 	}
 
-	return abi.Tuple(name, elems...)
+	t, err := abi.Tuple(name, elems...)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return t, elems, nil
 }
 
-func (contract *contractImpl) parseParam(param *abi.JSONParam, symbols Symbols) (abi.Encoder, error) {
+func (contract *contractImpl) parseParam(param *abi.JSONParam, binder Binder) (abi.Encoder, error) {
 	encoder, ok := abi.Builtin(param.Type)
 
 	if ok {
@@ -172,7 +153,7 @@ func (contract *contractImpl) parseParam(param *abi.JSONParam, symbols Symbols) 
 	if allMatch[0] == "tuple" {
 		var err error
 
-		encoder, err = contract.parseTuple(param, symbols)
+		encoder, err = contract.parseTuple(param, binder)
 
 		if err != nil {
 			return nil, err
@@ -219,7 +200,7 @@ func (contract *contractImpl) parseParam(param *abi.JSONParam, symbols Symbols) 
 	return encoder, nil
 }
 
-func (contract *contractImpl) parseTuple(param *abi.JSONParam, symbols Symbols) (abi.Encoder, error) {
+func (contract *contractImpl) parseTuple(param *abi.JSONParam, binder Binder) (abi.Encoder, error) {
 
 	allMatch := TupleNameRegex.FindStringSubmatch(param.InternalType)
 
@@ -227,7 +208,7 @@ func (contract *contractImpl) parseTuple(param *abi.JSONParam, symbols Symbols) 
 		return nil, errors.Wrap(abi.ErrJSON, "struct InternalType('%s') parse error", param.InternalType)
 	}
 
-	tuple, ok := symbols.GetTuple(allMatch[1])
+	tuple, ok := binder.GetTuple(allMatch[1])
 
 	if ok {
 		return tuple.Encoder, nil
@@ -237,7 +218,7 @@ func (contract *contractImpl) parseTuple(param *abi.JSONParam, symbols Symbols) 
 	var fields []string
 
 	for _, p := range param.Components {
-		elem, err := contract.parseParam(p, symbols)
+		elem, err := contract.parseParam(p, binder)
 
 		if err != nil {
 			return nil, err
@@ -259,13 +240,13 @@ func (contract *contractImpl) parseTuple(param *abi.JSONParam, symbols Symbols) 
 		Encoder:       encoder,
 	}
 
-	symbols.RegisterTuple(tuple)
+	binder.RegisterTuple(tuple)
 
 	return encoder, nil
 }
 
 // Parse json abi
-func Parse(data []byte, symbols Symbols) (abi.Contract, error) {
+func Parse(name string, data []byte, binder Binder) (abi.Contract, error) {
 
 	contract := &contractImpl{
 		funcs:       make(map[string]*funcABI),
@@ -280,10 +261,13 @@ func Parse(data []byte, symbols Symbols) (abi.Contract, error) {
 		return nil, errors.Wrap(err, "parse input json abi errorn")
 	}
 
+	binder.BeginContract(name, data)
+	defer binder.EndContract()
+
 	for i, field := range fields {
 		switch field.Type {
 		case abi.JSONTypeFunc:
-			abi, err := contract.parseFunc(i, field, symbols)
+			abi, err := contract.parseFunc(i, field, binder)
 
 			if err != nil {
 				return nil, err
@@ -292,7 +276,7 @@ func Parse(data []byte, symbols Symbols) (abi.Contract, error) {
 			contract.funcs[hex.EncodeToString(abi.selector)] = abi
 
 		case abi.JSONTypeConstructor:
-			abi, err := contract.parseFunc(i, field, symbols)
+			abi, err := contract.parseFunc(i, field, binder)
 
 			if err != nil {
 				return nil, err
@@ -313,12 +297,12 @@ func Parse(data []byte, symbols Symbols) (abi.Contract, error) {
 	return contract, nil
 }
 
-func ParseFile(filename string, symbols Symbols) (abi.Contract, error) {
+func ParseFile(name string, filename string, binder Binder) (abi.Contract, error) {
 	buff, err := ioutil.ReadFile(filename)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "read file: %s error", filename)
 	}
 
-	return Parse(buff, symbols)
+	return Parse(name, buff, binder)
 }
