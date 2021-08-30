@@ -89,7 +89,7 @@ func TestGen(t *testing.T) {
 
 	generator := NewGen()
 
-	_, err := ParseFile("Foo", "./testdata/CurveUSDVault.json", generator)
+	_, err := ParseFile("CurveUSDVault", "./testdata/CurveUSDVault.json", generator)
 
 	require.NoError(t, err)
 

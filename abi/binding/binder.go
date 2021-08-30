@@ -313,22 +313,22 @@ var tupleTmpl = template.Must(template.New("Gen").Parse(tupleTmplText))
 
 var contractTmplText = `
 {{range $index, $element := .}}
-type {{$element.Name}} interface {
-	{{range $_, $field := $element.Funcs}}
-	{{$field.Name}}(ctx context.Context, {{$field.GoInputParams}})({{$field.GoOutputParams}})
-	{{end}}
-}
+// type {{$element.Name}} interface {
+// 	{{range $_, $field := $element.Funcs}}
+// 	{{$field.Name}}(ctx context.Context, {{$field.GoInputParams}})({{$field.GoOutputParams}})
+// 	{{end}}
+// }
 
-type impl{{$element.Name}} struct {
-	contract abi.Contract
-	client client.Provider
-	signer signer.Signer
-	recipient string
+type {{$element.Name}} struct {
+	Contract abi.Contract
+	Client client.Provider
+	Signer signer.Signer
+	Recipient string
 }
 
 {{range $_, $field := $element.Funcs}}
-func (impl *impl{{$element.Name}}) {{$field.Name}}(ctx context.Context, {{$field.GoInputParams}})({{$field.GoOutputParams}}) {
-	f, ok :=  abi.TryGetFunc(impl.contract, "{{$field.Selector}}")
+func (impl *{{$element.Name}}) {{$field.Name}}(ctx context.Context, {{$field.GoInputParams}})({{$field.GoOutputParams}}) {
+	f, ok :=  abi.TryGetFunc(impl.Contract, "{{$field.Selector}}")
 
 	if !ok {
 		err = errors.Wrap(binding.ErrBinding, "func {{$field.Name}} not found")
@@ -345,13 +345,13 @@ func (impl *impl{{$element.Name}}) {{$field.Name}}(ctx context.Context, {{$field
 
 	{{if $field.ReadOnly}}
 	callSite := &client.CallSite {
-		To: impl.recipient,
+		To: impl.Recipient,
 		Data: hex.EncodeToString(buff),
 	}
 	
 	var ret string
 	
-	ret,err = impl.client.Call(ctx, callSite)
+	ret,err = impl.Client.Call(ctx, callSite)
 
 	if err != nil {
 		return
@@ -369,13 +369,13 @@ func (impl *impl{{$element.Name}}) {{$field.Name}}(ctx context.Context, {{$field
 
 	{{else}}
 	var callOps *abi.CallOps
-	callOps, err = abi.MakeCallOps(ctx, impl.client, impl.signer, ops)
+	callOps, err = abi.MakeCallOps(ctx, impl.Client, impl.Signer, ops)
 
 	if err != nil {
 		return
 	}
 
-	ret0, err = abi.MakeTransaction(ctx, impl.client, impl.signer, callOps, impl.recipient, buff)
+	ret0, err = abi.MakeTransaction(ctx, impl.Client, impl.Signer, callOps, impl.Recipient, buff)
 
 	return
 
