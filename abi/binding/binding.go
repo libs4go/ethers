@@ -59,8 +59,8 @@ type contractImpl struct {
 	constructor *funcABI            // contructor encoders
 }
 
-func (contract *contractImpl) Func(signature string) (abi.Func, bool) {
-	f, ok := contract.funcs[hex.EncodeToString(abi.Selector(signature))]
+func (contract *contractImpl) Select(selector string) (abi.Func, bool) {
+	f, ok := contract.funcs[selector]
 
 	return f, ok
 }
@@ -121,7 +121,7 @@ func (contract *contractImpl) parseFunc(index int, field *abi.JSONField, binder 
 
 	f.outputs = encoder
 
-	binder.Func(name, f.SelectorString(), inputs, outputs, field.Type == abi.JSONTypeConstructor, *field.StateMutability)
+	binder.Func(name, f.SelectorString(), inputs, outputs, field)
 
 	return f, nil
 }

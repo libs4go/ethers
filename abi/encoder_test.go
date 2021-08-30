@@ -258,3 +258,15 @@ func TestTuple(t *testing.T) {
 
 	require.Equal(t, d, true)
 }
+
+func TestArrayPtr(t *testing.T) {
+	call := func(a *[20]byte) {
+		*a = [20]byte{1}
+	}
+
+	var data [20]byte
+
+	call(&data)
+
+	require.Equal(t, data, [20]byte{1})
+}

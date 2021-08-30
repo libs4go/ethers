@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/libs4go/ethers/abi"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,7 +47,7 @@ func TestFooContract(t *testing.T) {
 
 	require.NoError(t, err)
 
-	f, ok := contract.Func("baz(uint32,bool)")
+	f, ok := abi.TryGetFunc(contract, "baz(uint32,bool)")
 
 	require.True(t, ok)
 
@@ -56,7 +57,7 @@ func TestFooContract(t *testing.T) {
 
 	require.Equal(t, hex.EncodeToString(buff), "cdcd77c000000000000000000000000000000000000000000000000000000000000000450000000000000000000000000000000000000000000000000000000000000001")
 
-	f, ok = contract.Func("bar(bytes3[2])")
+	f, ok = abi.TryGetFunc(contract, "bar(bytes3[2])")
 
 	require.True(t, ok)
 
@@ -72,7 +73,7 @@ func TestFooContract(t *testing.T) {
 
 	require.Equal(t, hex.EncodeToString(buff), "fce353f661626300000000000000000000000000000000000000000000000000000000006465660000000000000000000000000000000000000000000000000000000000")
 
-	f, ok = contract.Func("sam(bytes,bool,uint256[])")
+	f, ok = abi.TryGetFunc(contract, "sam(bytes,bool,uint256[])")
 
 	require.True(t, ok)
 
@@ -94,10 +95,11 @@ func TestGen(t *testing.T) {
 
 	var writerBuffer bytes.Buffer
 
-	require.NoError(t, generator.Write(&writerBuffer))
+	require.NoError(t, generator.Write("testdata", &writerBuffer))
 
-	println(writerBuffer.String())
+	// println(writerBuffer.String())
 
+	ioutil.WriteFile("./testdata/test.go", writerBuffer.Bytes(), 077)
 }
 
 func TestToUpper(t *testing.T) {

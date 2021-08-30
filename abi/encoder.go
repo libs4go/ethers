@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/libs4go/errors"
+	"github.com/libs4go/ethers/address"
 	"github.com/libs4go/fixed"
 	"golang.org/x/crypto/sha3"
 )
@@ -222,6 +223,64 @@ func (enc *integerEncoder) Unmarshal(data []byte, v interface{}) (uint, error) {
 
 		return 0, errors.Wrap(ErrValue, "expect int/uint types ptr")
 	}
+}
+
+type addressEncoder struct {
+	Encoder
+}
+
+func Address() (Encoder, error) {
+	i, err := Integer(false, 160)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &addressEncoder{
+		Encoder: i,
+	}, nil
+}
+
+func (enc *addressEncoder) String() string {
+	return "address"
+
+}
+
+func (enc *addressEncoder) GoTypeName() string {
+	return "address.Address"
+}
+
+func (enc *addressEncoder) Marshal(value interface{}) ([]byte, error) {
+	addr, ok := value.(address.Address)
+
+	if !ok {
+		return nil, errors.Wrap(ErrValue, "expect bool")
+	}
+
+	v := new(big.Int).SetBytes(addr[:])
+
+	return enc.Encoder.Marshal(v)
+}
+
+func (enc *addressEncoder) Unmarshal(data []byte, v interface{}) (uint, error) {
+	vv, ok := v.(*address.Address)
+
+	if !ok {
+		return 0, errors.Wrap(ErrValue, "expect *address.Address")
+	}
+
+	var i *big.Int
+
+	length, err := enc.Encoder.Unmarshal(data, &i)
+
+	if err != nil {
+		return 0, err
+	}
+
+	*vv = address.BytesToAddress(i.Bytes())
+
+	return length, nil
+
 }
 
 type boolEncoder struct {
@@ -1153,11 +1212,12 @@ func initBuiltinTypeEncoders() {
 
 	encoders = append(encoders, ensure(Bytes()))
 
+	encoders = append(encoders, ensure(Address()))
+
 	for _, encoder := range encoders {
 		builtinTypeEncoders[encoder.String()] = encoder
 	}
 
-	builtinTypeEncoders["address"] = builtinTypeEncoders["uint160"]
 	builtinTypeEncoders["uint"] = builtinTypeEncoders["uint256"]
 	builtinTypeEncoders["int"] = builtinTypeEncoders["int256"]
 }
