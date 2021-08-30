@@ -21,9 +21,9 @@ var (
 )
 
 type Tuple struct {
-	BindingName   string      // golang binding struct name
-	BindingFields []string    // golang binding struct field
-	Encoder       abi.Encoder // tuple abi encoder
+	BindingName   string            // golang binding struct name
+	BindingFields map[string]string // golang binding struct field
+	Encoder       abi.Encoder       // tuple abi encoder
 }
 
 type funcABI struct {
@@ -66,6 +66,17 @@ func (contract *contractImpl) Func(signature string) (abi.Func, bool) {
 }
 
 func (contract *contractImpl) parseFunc(index int, field *abi.JSONField, binder Binder) (*funcABI, error) {
+
+	name := strings.Title(field.Name)
+
+	if field.Type == abi.JSONTypeConstructor {
+		name = "contructor"
+	}
+
+	if field.StateMutability == nil {
+		return nil, errors.Wrap(abi.ErrJSON, "func(%s) StateMutability expect", field.Name)
+	}
+
 	if field.Type != abi.JSONTypeFunc && field.Type != abi.JSONTypeConstructor {
 		return nil, errors.Wrap(abi.ErrJSON, "parse func target(%s) error", field.Type)
 	}
@@ -110,7 +121,7 @@ func (contract *contractImpl) parseFunc(index int, field *abi.JSONField, binder 
 
 	f.outputs = encoder
 
-	binder.Func(field.Name, f.SelectorString(), inputs, outputs)
+	binder.Func(name, f.SelectorString(), inputs, outputs, field.Type == abi.JSONTypeConstructor, *field.StateMutability)
 
 	return f, nil
 }
@@ -215,7 +226,7 @@ func (contract *contractImpl) parseTuple(param *abi.JSONParam, binder Binder) (a
 	}
 
 	var elems []abi.Encoder
-	var fields []string
+	fields := make(map[string]string)
 
 	for _, p := range param.Components {
 		elem, err := contract.parseParam(p, binder)
@@ -225,7 +236,8 @@ func (contract *contractImpl) parseTuple(param *abi.JSONParam, binder Binder) (a
 		}
 
 		elems = append(elems, elem)
-		fields = append(fields, elem.GoTypeName())
+
+		fields[strings.Title(p.Name)] = elem.GoTypeName()
 	}
 
 	encoder, err := abi.Tuple(allMatch[1], elems...)

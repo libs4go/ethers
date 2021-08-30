@@ -472,7 +472,7 @@ func (enc *fixedArrayEncoder) String() string {
 }
 
 func (enc *fixedArrayEncoder) GoTypeName() string {
-	return fmt.Sprintf("[%d]%s", enc.len, enc.elem)
+	return fmt.Sprintf("[%d]%s", enc.len, enc.elem.GoTypeName())
 }
 
 func (enc *fixedArrayEncoder) Marshal(value interface{}) ([]byte, error) {
@@ -850,7 +850,7 @@ func (enc *arrayEncoder) String() string {
 }
 
 func (enc *arrayEncoder) GoTypeName() string {
-	return fmt.Sprintf("[]%s", enc.elem)
+	return fmt.Sprintf("[]%s", enc.elem.GoTypeName())
 }
 
 func (enc *arrayEncoder) Marshal(value interface{}) ([]byte, error) {

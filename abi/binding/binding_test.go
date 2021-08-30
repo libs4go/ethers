@@ -1,10 +1,12 @@
 package binding
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -38,9 +40,9 @@ func TestLoadFiles(t *testing.T) {
 }
 
 func TestFooContract(t *testing.T) {
-	symbols := NewSymbols()
+	generator := NewGen()
 
-	contract, err := ParseFile("Foo", "./testdata/Foo.json", symbols)
+	contract, err := ParseFile("Foo", "./testdata/Foo.json", generator)
 
 	require.NoError(t, err)
 
@@ -79,4 +81,25 @@ func TestFooContract(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, hex.EncodeToString(buff), "a5643bf20000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000464617665000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003")
+
+}
+
+func TestGen(t *testing.T) {
+
+	generator := NewGen()
+
+	_, err := ParseFile("Foo", "./testdata/CurveUSDVault.json", generator)
+
+	require.NoError(t, err)
+
+	var writerBuffer bytes.Buffer
+
+	require.NoError(t, generator.Write(&writerBuffer))
+
+	println(writerBuffer.String())
+
+}
+
+func TestToUpper(t *testing.T) {
+	println(strings.Title("hello world"))
 }
