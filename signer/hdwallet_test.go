@@ -17,6 +17,8 @@ func TestSigner(t *testing.T) {
 
 	require.NoError(t, err)
 
+	println(s.Addresss())
+
 	gasPrice, err := fixed.New(18, fixed.Float(0.000000018))
 
 	require.NoError(t, err)
@@ -29,7 +31,7 @@ func TestSigner(t *testing.T) {
 
 	println(fmt.Sprintf("%.10f", gasPrice.Float()))
 
-	recipient := [20]byte(address.HexToAddress("0xaa25aa7a19f9c426e07dee59b12f944f4d9f1dd3"))
+	recipient := [20]byte(address.HexToAddress("0x44A347Cf7278685320a05Cb39e903C42e472e262"))
 
 	tx := &Transaction{
 		AccountNonce: 0,
